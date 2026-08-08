@@ -2,7 +2,7 @@
 
 フェーズ境界と現在地のみ。手順分解は TodoList 側で持つ。
 
-**現在地: Phase 3（デプロイ完了 / ブログ導線が残り）**
+**現在地: Phase 3（公開済み / ブログ導線が残り）**
 
 ---
 
@@ -46,7 +46,7 @@
 
 ## Phase 3: 公開
 
-- [x] ホスティング先を決定 — GitHub Pages（ブログのドメインは ConoHa WING 管理）
+- [x] ホスティング先を決定 — GitHub Pages。独自ドメインは使わない
 - [x] デプロイ — https://kwrkb.github.io/schedule-gen/
 - [ ] ブログ記事との相互導線
 

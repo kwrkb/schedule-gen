@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # GitHub Actions のバージョン追随。放置すると Node ランタイムの非推奨警告が出る
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: ci
+
+  # ビルドツールのみ（ランタイム依存はゼロ）。マイナー・パッチはまとめて1つの PR にする
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: deps
+    groups:
+      build-tools:
+        patterns: ['*']
+        update-types: [minor, patch]

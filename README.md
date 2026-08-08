@@ -77,3 +77,7 @@ npm run build      # 静的ファイルを dist へ出力
 | [PLAN.md](PLAN.md) | フェーズ進捗 |
 | [LESSONS.md](LESSONS.md) | なぜこうなっているか。何を試して捨てたか |
 | `proto/prototype_shift.py` | アルゴリズムの原型（Python） |
+
+## ライセンス
+
+[MIT](LICENSE)

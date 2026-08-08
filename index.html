@@ -4,9 +4,52 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>シフトたたき台ジェネレーター</title>
+    <meta
+      name="description"
+      content="人数とシフト数を入れるだけで、連勤や勤務間インターバルに配慮した1ヶ月シフトのたたき台を作ります。"
+    />
   </head>
   <body>
-    <div id="app"></div>
+    <main>
+      <header>
+        <h1>シフトたたき台ジェネレーター</h1>
+        <p class="lead">
+          人数とシフト数だけ入れてください。連勤・勤務間インターバル・負担の偏りは自動で配慮します。
+          <strong>完成品ではなくたたき台です。</strong>Excel に貼って手直ししてください。
+        </p>
+      </header>
+
+      <form id="form">
+        <div class="fields">
+          <label>
+            <span>人数</span>
+            <input id="people" type="number" value="8" min="1" max="50" required />
+          </label>
+          <label>
+            <span>シフト数</span>
+            <input id="shifts" type="number" value="3" min="1" max="6" required />
+          </label>
+          <label>
+            <span>日数</span>
+            <input id="days" type="number" value="30" min="28" max="31" required />
+          </label>
+        </div>
+        <button id="submit" type="submit">シフトを作る</button>
+        <p class="hint">もう一度押すと別の案が出ます。</p>
+      </form>
+
+      <p id="status" role="status" aria-live="polite" hidden></p>
+
+      <section id="output" hidden>
+        <div class="output-head">
+          <p id="summary"></p>
+          <button id="copy" type="button">Excel 用にコピー</button>
+        </div>
+        <div class="table-wrap">
+          <table id="table"></table>
+        </div>
+      </section>
+    </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

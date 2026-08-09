@@ -63,6 +63,21 @@ const cellClass = (value: number, shifts: number): string => {
   return 's-mid'
 }
 
+/**
+ * 多スタートはハード制約違反ゼロを保証しない（VISION.md「多スタート」）。
+ * 違反が残った解も「たたき台」としては使えるので表は出すが、
+ * 手直しが要ることが分かるよう警告を添える。
+ */
+const violationNote = (result: GenerateResult): string => {
+  const { cover, consec, interval } = result.violations
+  const parts: string[] = []
+  if (cover > 0) parts.push(`シフトの欠員 ${cover}件`)
+  if (consec > 0) parts.push(`連勤上限超え ${consec}件`)
+  if (interval > 0) parts.push(`勤務間インターバル違反 ${interval}件`)
+  if (parts.length === 0) return ''
+  return `${parts.join(' / ')} が残っています。手直ししてから使ってください。`
+}
+
 const setStatus = (message: string, isError = false): void => {
   statusLine.textContent = message
   statusLine.classList.toggle('error', isError)
@@ -154,7 +169,8 @@ form.addEventListener('submit', async (event) => {
       return
     }
     render(result, days)
-    setStatus('')
+    const note = violationNote(result)
+    setStatus(note, note !== '')
   } finally {
     submitButton.disabled = false
   }

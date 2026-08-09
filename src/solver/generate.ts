@@ -9,7 +9,12 @@ import type { SolveResult, Stats, Violations } from './solver'
  */
 export interface GenerateOptions {
   maxConsec?: number
-  /** 基準シード。同じ値なら結果は再現する。 */
+  /**
+   * 基準シード。試行 n 回目は `seed + n` を使うため、試行回数が同じなら結果も同じになる。
+   *
+   * ただし試行を打ち切るのは時間予算なので、マシン負荷によって試行回数は変わりうる。
+   * 完全に決定的にしたい場合は `timeBudgetMs` を十分大きくして `maxAttempts` で回数を固定する。
+   */
   seed?: number
   /** 多スタート全体の時間予算 */
   timeBudgetMs?: number

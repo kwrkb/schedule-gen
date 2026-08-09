@@ -104,6 +104,12 @@ button:disabled {
   border-color: var(--line);
 }
 
+.field-note {
+  font-size: 0.75rem;
+  color: var(--muted);
+  min-height: 1.2em;
+}
+
 .hint {
   margin: 0.6rem 0 0;
   font-size: 0.8rem;

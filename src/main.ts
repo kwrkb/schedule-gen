@@ -1,5 +1,5 @@
 import './style.css'
-import { REST, generate } from './solver'
+import { REST, generate, maxShiftsFor } from './solver'
 import type { GenerateResult } from './solver'
 
 const el = <T extends HTMLElement>(id: string): T => {
@@ -12,6 +12,7 @@ const form = el<HTMLFormElement>('form')
 const peopleInput = el<HTMLInputElement>('people')
 const shiftsInput = el<HTMLInputElement>('shifts')
 const daysInput = el<HTMLInputElement>('days')
+const shiftsNote = el<HTMLElement>('shifts-note')
 const submitButton = el<HTMLButtonElement>('submit')
 const copyButton = el<HTMLButtonElement>('copy')
 const statusLine = el<HTMLParagraphElement>('status')
@@ -31,12 +32,50 @@ const clamp = (input: HTMLInputElement): number => {
   return fixed
 }
 
+/**
+ * シフト数の上限は人数と日数から決まるため、入力欄の max を追随させる。
+ *
+ * 人数を打ち替えている途中（空欄・1桁）に値を書き換えると入力が壊れるので、
+ * 上限が確定できないときは注記だけ消して値には触れない。
+ */
+const syncShiftsMax = (fix: boolean): void => {
+  const people = Number(peopleInput.value)
+  const days = Number(daysInput.value)
+  const inRange = (v: number, i: HTMLInputElement) =>
+    Number.isFinite(v) && v >= Number(i.min) && v <= Number(i.max)
+
+  if (!inRange(people, peopleInput) || !inRange(days, daysInput)) {
+    shiftsNote.textContent = ''
+    return
+  }
+
+  const max = maxShiftsFor(people, days)
+  shiftsInput.max = String(max)
+  shiftsNote.textContent = `${people}人なら最大 ${max}`
+  if (fix && Number(shiftsInput.value) > max) shiftsInput.value = String(max)
+}
+
 /** シフト値に対応するセルの色クラス。早番と遅番だけ区別できれば十分。 */
 const cellClass = (value: number, shifts: number): string => {
   if (value === REST) return 's-rest'
   if (value === 1) return 's-early'
   if (value === shifts) return 's-late'
   return 's-mid'
+}
+
+/**
+ * 多スタートはハード制約違反ゼロを保証しない（VISION.md「多スタート」）。
+ * 違反が残った解も「たたき台」としては使えるので表は出すが、
+ * 手直しが要ることが分かるよう警告を添える。
+ */
+const violationNote = (result: GenerateResult): string => {
+  const { cover, consec, interval } = result.violations
+  const parts: string[] = []
+  if (cover > 0) parts.push(`シフトの欠員 ${cover}件`)
+  if (consec > 0) parts.push(`連勤上限超え ${consec}件`)
+  if (interval > 0) parts.push(`勤務間インターバル違反 ${interval}件`)
+  if (parts.length === 0) return ''
+  return `${parts.join(' / ')} が残っています。手直ししてから使ってください。`
 }
 
 const setStatus = (message: string, isError = false): void => {
@@ -98,11 +137,22 @@ const yieldToPaint = (): Promise<void> =>
     requestAnimationFrame(() => setTimeout(resolve, 0))
   })
 
+for (const input of [peopleInput, daysInput]) {
+  input.addEventListener('input', () => syncShiftsMax(false))
+  input.addEventListener('change', () => {
+    clamp(input)
+    syncShiftsMax(true)
+  })
+}
+syncShiftsMax(true)
+
 form.addEventListener('submit', async (event) => {
   event.preventDefault()
   const people = clamp(peopleInput)
-  const shifts = clamp(shiftsInput)
   const days = clamp(daysInput)
+  // 人数と日数を確定させてからシフト数の上限を決める
+  syncShiftsMax(false)
+  const shifts = clamp(shiftsInput)
 
   submitButton.disabled = true
   setStatus('計算中…')
@@ -119,7 +169,8 @@ form.addEventListener('submit', async (event) => {
       return
     }
     render(result, days)
-    setStatus('')
+    const note = violationNote(result)
+    setStatus(note, note !== '')
   } finally {
     submitButton.disabled = false
   }

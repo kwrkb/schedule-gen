@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { REST, Solver, makeLabels, maxShiftsFor, violatesInterval } from './solver'
-import { generate } from './generate'
+import { generate, type GenerateOptions } from './generate'
 
 const spread = (xs: number[]) => Math.max(...xs) - Math.min(...xs)
 
@@ -98,9 +98,18 @@ describe('決定性', () => {
 // VISION 記載の検証ケース。Python プロトタイプと同一の乱数列は再現できないため、
 // 「ハード制約違反ゼロ」「出勤日数・遅番回数がほぼ均等」という性質で検証する。
 //
+// budgetMs を持つケースは多スタートの時間予算を上書きする（既定は generate() の800ms）。
 // work は出勤日数の許容幅。シフト数が人数の8割に近づくほど1日の休み枠が細り、
 // 端数の吸収先がなくなるため幅が広がる（構造的な限界であり探索の失敗ではない）。
-const CASES = [
+interface Case {
+  P: number
+  S: number
+  D: number
+  work: number
+  budgetMs?: number
+}
+
+const CASES: Case[] = [
   { P: 8, S: 3, D: 30, work: 1 },
   { P: 12, S: 4, D: 30, work: 1 },
   { P: 20, S: 3, D: 31, work: 1 },
@@ -114,18 +123,22 @@ const CASES = [
   { P: 10, S: 8, D: 31, work: 2 },
   { P: 25, S: 20, D: 31, work: 3 },
   // UI で入力できる最大構成。休み枠が最も細るため出勤日数の幅は4日まで広がる。
-  { P: 50, S: 40, D: 31, work: 4 },
-] as const
+  // 既定の時間予算800msは12回の試行とほぼ拮抗しており、マシン速度で試行回数が変わって
+  // 解の質がぶれる。ここでは予算を外して12回を必ず使い切らせ、決定的に測る。
+  { P: 50, S: 40, D: 31, work: 4, budgetMs: 60_000 },
+]
 
 // 単発の焼きなましは局所最適に落ちることがあるため、複数の基準シードで確認する。
 const SEEDS = [0, 1, 2, 3, 4] as const
 
-describe.each(CASES)('$P人 × $S シフト × $D日', ({ P, S, D, work }) => {
-  const runs = SEEDS.map((seed) => {
-    const { result, message } = generate(P, S, D, { seed })
+describe.each(CASES)('$P人 × $S シフト × $D日', ({ P, S, D, work, budgetMs }) => {
+  const run = (seed: number, options: GenerateOptions = {}) => {
+    const { result, message } = generate(P, S, D, { seed, ...options })
     if (result === null) throw new Error(`解が得られませんでした: ${message}`)
     return result
-  })
+  }
+
+  const runs = SEEDS.map((seed) => run(seed, budgetMs === undefined ? {} : { timeBudgetMs: budgetMs }))
 
   it('入力がシフト数の上限に収まっている', () => {
     expect(S).toBeLessThanOrEqual(maxShiftsFor(P, D))
@@ -181,6 +194,8 @@ describe.each(CASES)('$P人 × $S シフト × $D日', ({ P, S, D, work }) => {
   })
 
   it('Python プロトタイプ(最大2.84s)より速い', () => {
-    for (const r of runs) expect(r.elapsedMs).toBeLessThan(2840)
+    // 予算を広げたケースの所要時間は試行回数で決まるので、UI 既定の予算で測り直す
+    const timed = budgetMs === undefined ? runs : SEEDS.map((seed) => run(seed))
+    for (const r of timed) expect(r.elapsedMs).toBeLessThan(2840)
   })
 })

@@ -1,5 +1,5 @@
 import './style.css'
-import { REST, generate } from './solver'
+import { REST, generate, maxShiftsFor } from './solver'
 import type { GenerateResult } from './solver'
 
 const el = <T extends HTMLElement>(id: string): T => {
@@ -12,6 +12,7 @@ const form = el<HTMLFormElement>('form')
 const peopleInput = el<HTMLInputElement>('people')
 const shiftsInput = el<HTMLInputElement>('shifts')
 const daysInput = el<HTMLInputElement>('days')
+const shiftsNote = el<HTMLElement>('shifts-note')
 const submitButton = el<HTMLButtonElement>('submit')
 const copyButton = el<HTMLButtonElement>('copy')
 const statusLine = el<HTMLParagraphElement>('status')
@@ -29,6 +30,29 @@ const clamp = (input: HTMLInputElement): number => {
   const fixed = Number.isFinite(value) ? Math.min(max, Math.max(min, Math.round(value))) : min
   input.value = String(fixed)
   return fixed
+}
+
+/**
+ * シフト数の上限は人数と日数から決まるため、入力欄の max を追随させる。
+ *
+ * 人数を打ち替えている途中（空欄・1桁）に値を書き換えると入力が壊れるので、
+ * 上限が確定できないときは注記だけ消して値には触れない。
+ */
+const syncShiftsMax = (fix: boolean): void => {
+  const people = Number(peopleInput.value)
+  const days = Number(daysInput.value)
+  const inRange = (v: number, i: HTMLInputElement) =>
+    Number.isFinite(v) && v >= Number(i.min) && v <= Number(i.max)
+
+  if (!inRange(people, peopleInput) || !inRange(days, daysInput)) {
+    shiftsNote.textContent = ''
+    return
+  }
+
+  const max = maxShiftsFor(people, days)
+  shiftsInput.max = String(max)
+  shiftsNote.textContent = `${people}人なら最大 ${max}`
+  if (fix && Number(shiftsInput.value) > max) shiftsInput.value = String(max)
 }
 
 /** シフト値に対応するセルの色クラス。早番と遅番だけ区別できれば十分。 */
@@ -98,11 +122,22 @@ const yieldToPaint = (): Promise<void> =>
     requestAnimationFrame(() => setTimeout(resolve, 0))
   })
 
+for (const input of [peopleInput, daysInput]) {
+  input.addEventListener('input', () => syncShiftsMax(false))
+  input.addEventListener('change', () => {
+    clamp(input)
+    syncShiftsMax(true)
+  })
+}
+syncShiftsMax(true)
+
 form.addEventListener('submit', async (event) => {
   event.preventDefault()
   const people = clamp(peopleInput)
-  const shifts = clamp(shiftsInput)
   const days = clamp(daysInput)
+  // 人数と日数を確定させてからシフト数の上限を決める
+  syncShiftsMax(false)
+  const shifts = clamp(shiftsInput)
 
   submitButton.disabled = true
   setStatus('計算中…')

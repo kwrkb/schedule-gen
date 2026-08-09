@@ -8,12 +8,49 @@ const W_CONSEC = 5000 // 連勤上限超過
 const W_INTERVAL = 3000 // 遅番→翌日早番（勤務間インターバル11時間の近似）
 const W_SHIFTVAR = 40 // シフト構成の偏り
 const W_RESTGAP = 8 // 休み間隔の偏り
-const W_SAME3 = 4 // 同一シフト3連続
+const W_SAME3 = 30 // 同一シフト3連続
+const W_LATERUN = 150 // 遅番4連続以降（3連続までに抑えるためのソフト拘束）
+
+/** 人数に対してシフト数をここまでしか許さない。超えると探索が破綻して連勤違反が残る。 */
+const MAX_SHIFT_RATIO = 0.8
 
 export function makeLabels(n: number): string[] {
   if (n === 1) return ['日勤']
   if (n === 2) return ['早', '遅']
   return ['早', ...Array.from({ length: n - 2 }, (_, i) => `中${i + 1}`), '遅']
+}
+
+/**
+ * 勤務間インターバル（11時間）の近似。最も遅いシフト S の翌日に許すのは
+ * 「休み」「遅番 S」「その1つ前 S-1（ただし早番は除く）」だけ。
+ *
+ * シフト数が多いと 遅(6)→中1(2) のような大きな逆行が起きうるが、
+ * これは 遅→早 と実質同じ負担になるため同列に禁止する。
+ * S=2 では S-1 が早番そのものなので、従来どおり 遅→早 が禁止される。
+ */
+export function violatesInterval(prev: number, next: number, S: number): boolean {
+  if (S < 2 || prev !== S || next === REST) return false
+  return next === 1 || next < S - 1
+}
+
+/**
+ * この人数・日数で成立するシフト数の上限。UI の入力上限にも使う。
+ *
+ * - 各シフトに毎日1人以上置くと、1日の休み枠は P-S 人しかない。全体の休み枠
+ *   (P-S)*D が、全員が連勤上限を守るのに必要な休み総数 P*minRest を下回るなら、
+ *   どう組んでも連勤違反が残る
+ * - 数学的に成立してもその境界付近は探索が解を見つけられない
+ *   （7人×6シフト = 86% は理論上可能だが、実測では10シード中に連勤違反が出る）。
+ *   そのため人数の8割でも頭打ちにする
+ *
+ * 0 以下を返す場合はその人数・日数では連勤上限を守れない（人数が足りない）。
+ */
+export function maxShiftsFor(P: number, D: number, maxConsec = 6): number {
+  // 連勤上限を守るには、D日を「連勤 maxConsec 日 + 休み1日」の塊で割る必要がある
+  const minRest = Math.max(0, Math.ceil((D - maxConsec) / (maxConsec + 1)))
+  // (P - S) * D >= P * minRest  ->  S <= P - P*minRest/D
+  const byRest = Math.floor(P - (P * minRest) / D)
+  return Math.min(P, Math.floor(P * MAX_SHIFT_RATIO), byRest)
 }
 
 export interface SolveOptions {
@@ -84,18 +121,30 @@ export class Solver {
     }
     const col: number[] = []
     for (let i = 0; i < workers; i++) col.push(1 + (i % S))
-    // P < S のときは rest が負になるが、その場合 feasible() が先に false を返すため
-    // この列は使われない。Python は負の乗算が空リストになるので同じ結果になる。
+    // S が maxShifts() を超えると rest が負になりうるが、
+    // その場合は feasible() が先に false を返すためこの列は使われない。
     for (let i = 0; i < rest; i++) col.push(REST)
     return col
   }
 
+  /** この人数・日数で成立するシフト数の上限。@see maxShiftsFor */
+  maxShifts(): number {
+    return maxShiftsFor(this.P, this.D, this.maxConsec)
+  }
+
   /** 探索前に数学的に解の有無を判定する。 */
   feasible(): { ok: boolean; message: string } {
-    if (this.P < this.S) {
+    const max = this.maxShifts()
+    if (max < 1) {
       return {
         ok: false,
-        message: `人数(${this.P})がシフト数(${this.S})より少ないため、全シフトを埋められません`,
+        message: `${this.P}人では${this.D}日を連勤${this.maxConsec}日以内で回せません。人数を増やしてください`,
+      }
+    }
+    if (this.S > max) {
+      return {
+        ok: false,
+        message: `${this.P}人で組めるのは最大${max}シフトまでです（連勤${this.maxConsec}日以内と各シフト最低1人を両立できません）`,
       }
     }
     return { ok: true, message: '' }
@@ -132,10 +181,12 @@ export class Solver {
       }
       if (d > 0) {
         const prev = row[d - 1]
-        if (S >= 2 && prev === S && v === 1) c += W_INTERVAL
+        if (violatesInterval(prev, v, S)) c += W_INTERVAL
         if (v !== REST && v === prev) {
           same += 1
           if (same >= 3) c += W_SAME3
+          // 遅番だけは4連続以降を重く見る（3連続までに収める）
+          if (v === S && same >= 4) c += W_LATERUN
         } else {
           same = 1
         }
@@ -283,10 +334,8 @@ export class Solver {
           run = 0
         }
       }
-      if (S >= 2) {
-        for (let d = 0; d < D - 1; d++) {
-          if (row[d] === S && row[d + 1] === 1) violations.interval += 1
-        }
+      for (let d = 0; d < D - 1; d++) {
+        if (violatesInterval(row[d], row[d + 1], S)) violations.interval += 1
       }
       works.push(row.filter((v) => v !== REST).length)
       lates.push(row.filter((v) => v === S).length)

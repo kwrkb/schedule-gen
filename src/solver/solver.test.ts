@@ -131,7 +131,12 @@ const CASES: Case[] = [
 // 単発の焼きなましは局所最適に落ちることがあるため、複数の基準シードで確認する。
 const SEEDS = [0, 1, 2, 3, 4] as const
 
-describe.each(CASES)('$P人 × $S シフト × $D日', ({ P, S, D, work, budgetMs }) => {
+// ケース名は事前に組み立てて %s で渡す。テンプレートに `$P人` と書くと、vitest 5 以降は
+// 変数名に Unicode 文字を含めて `P人` と解釈し、展開されずに全ケースが同名になる。
+// `$name` で渡すと vitest 4 では文字列が引用符付きで表示されるため %s を使う。
+const NAMED_CASES = CASES.map((c) => [`${c.P}人 × ${c.S} シフト × ${c.D}日`, c] as const)
+
+describe.each(NAMED_CASES)('%s', (_name, { P, S, D, work, budgetMs }) => {
   const run = (seed: number, options: GenerateOptions = {}) => {
     const { result, message } = generate(P, S, D, { seed, ...options })
     if (result === null) throw new Error(`解が得られませんでした: ${message}`)

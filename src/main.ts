@@ -18,6 +18,7 @@ const copyButton = el<HTMLButtonElement>('copy')
 const statusLine = el<HTMLParagraphElement>('status')
 const output = el<HTMLElement>('output')
 const summary = el<HTMLParagraphElement>('summary')
+const warning = el<HTMLParagraphElement>('warning')
 const table = el<HTMLTableElement>('table')
 
 /** 直近の結果。コピー用に保持する。 */
@@ -67,6 +68,9 @@ const cellClass = (value: number, shifts: number): string => {
  * 多スタートはハード制約違反ゼロを保証しない（VISION.md「多スタート」）。
  * 違反が残った解も「たたき台」としては使えるので表は出すが、
  * 手直しが要ることが分かるよう警告を添える。
+ *
+ * 警告は表と一緒に出し、コピー結果の通知（#status）とは分ける。
+ * 通知で上書きされると、Excel へ移る時点で違反の存在を見落とすため。
  */
 const violationNote = (result: GenerateResult): string => {
   const { cover, consec, interval } = result.violations
@@ -75,14 +79,20 @@ const violationNote = (result: GenerateResult): string => {
   if (consec > 0) parts.push(`連勤上限超え ${consec}件`)
   if (interval > 0) parts.push(`勤務間インターバル違反 ${interval}件`)
   if (parts.length === 0) return ''
-  return `${parts.join(' / ')} が残っています。手直ししてから使ってください。`
+  return (
+    `この案には ${parts.join(' / ')} が残っています。手直ししてから使ってください。` +
+    'この警告は生成した時点の案に対するものです。Excel で手直しした後は改めて確認してください。'
+  )
 }
 
-const setStatus = (message: string, isError = false): void => {
-  statusLine.textContent = message
-  statusLine.classList.toggle('error', isError)
-  statusLine.hidden = message === ''
+/** 1行のメッセージ欄に表示する。空文字なら欄ごと隠す。 */
+const showMessage = (target: HTMLElement, message: string, isError = false): void => {
+  target.textContent = message
+  target.classList.toggle('error', isError)
+  target.hidden = message === ''
 }
+
+const setStatus = (message: string, isError = false): void => showMessage(statusLine, message, isError)
 
 function render(result: GenerateResult, days: number): void {
   const { grid, labels, works } = result
@@ -127,6 +137,7 @@ function render(result: GenerateResult, days: number): void {
   summary.textContent =
     `${grid.length}人 × ${labels.join('・')} × ${days}日 / ` +
     `出勤 ${Math.min(...works)}〜${Math.max(...works)}日 / ${(result.elapsedMs / 1000).toFixed(2)}秒`
+  showMessage(warning, violationNote(result))
   output.hidden = false
   current = { result, days }
 }
@@ -169,8 +180,7 @@ form.addEventListener('submit', async (event) => {
       return
     }
     render(result, days)
-    const note = violationNote(result)
-    setStatus(note, note !== '')
+    setStatus('')
   } finally {
     submitButton.disabled = false
   }

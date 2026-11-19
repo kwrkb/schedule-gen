@@ -85,11 +85,14 @@ const violationNote = (result: GenerateResult): string => {
   )
 }
 
-const setStatus = (message: string, isError = false): void => {
-  statusLine.textContent = message
-  statusLine.classList.toggle('error', isError)
-  statusLine.hidden = message === ''
+/** 1行のメッセージ欄に表示する。空文字なら欄ごと隠す。 */
+const showMessage = (target: HTMLElement, message: string, isError = false): void => {
+  target.textContent = message
+  target.classList.toggle('error', isError)
+  target.hidden = message === ''
 }
+
+const setStatus = (message: string, isError = false): void => showMessage(statusLine, message, isError)
 
 function render(result: GenerateResult, days: number): void {
   const { grid, labels, works } = result
@@ -134,9 +137,7 @@ function render(result: GenerateResult, days: number): void {
   summary.textContent =
     `${grid.length}人 × ${labels.join('・')} × ${days}日 / ` +
     `出勤 ${Math.min(...works)}〜${Math.max(...works)}日 / ${(result.elapsedMs / 1000).toFixed(2)}秒`
-  const note = violationNote(result)
-  warning.textContent = note
-  warning.hidden = note === ''
+  showMessage(warning, violationNote(result))
   output.hidden = false
   current = { result, days }
 }
@@ -174,8 +175,6 @@ form.addEventListener('submit', async (event) => {
     const { result, message } = generate(people, shifts, days, { seed })
     if (result === null) {
       output.hidden = true
-      warning.textContent = ''
-      warning.hidden = true
       current = null
       setStatus(message || '条件に合うシフトが見つかりませんでした', true)
       return

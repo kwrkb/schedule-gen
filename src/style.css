@@ -9,6 +9,7 @@
   --early: #e6f0ea;
   --late: #ece7f3;
   --mid: #f3efe4;
+  --error: #a03a2f;
 }
 
 * {
@@ -123,7 +124,7 @@ button:disabled {
 }
 
 #status.error {
-  color: #a03a2f;
+  color: var(--error);
 }
 
 .output-head {
@@ -139,7 +140,7 @@ button:disabled {
   margin: 0 0 0.75rem;
   padding: 0.6rem 0.8rem;
   font-size: 0.9rem;
-  color: #a03a2f;
+  color: var(--error);
   background: #fbefec;
   border: 1px solid #e8c4bd;
   border-radius: 0.4rem;

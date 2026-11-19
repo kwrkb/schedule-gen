@@ -135,6 +135,16 @@ button:disabled {
   margin: 2rem 0 0.75rem;
 }
 
+#warning {
+  margin: 0 0 0.75rem;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.9rem;
+  color: #a03a2f;
+  background: #fbefec;
+  border: 1px solid #e8c4bd;
+  border-radius: 0.4rem;
+}
+
 #summary {
   margin: 0;
   font-size: 0.85rem;
